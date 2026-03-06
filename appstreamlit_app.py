@@ -1,26 +1,43 @@
-import numpy as np
+import os
+import urllib.request
 import streamlit as st
 import tensorflow as tf
+import numpy as np
 from PIL import Image
-
-CLASS_NAMES = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
 
 st.title("EmotionVision — Facial Emotion Recognition")
 
-model = tf.keras.models.load_model("models/cnn_emotion_model.keras")
+CLASS_NAMES = ["Angry","Disgust","Fear","Happy","Sad","Surprise","Neutral"]
 
-uploaded = st.file_uploader("Upload a face image", type=["png", "jpg", "jpeg"])
+MODEL_PATH = "models/cnn_emotion_model.keras"
 
-if uploaded:
-    img = Image.open(uploaded).convert("L").resize((48, 48))
-    arr = np.array(img).astype("float32") / 255.0
-    arr = np.expand_dims(arr, axis=(0, -1))
+MODEL_URL = "https://drive.google.com/uc?id=1NvpU_AfmHOLgiZm6N0MX3MztdNA0COti"
 
-    probs = model.predict(arr, verbose=0)[0]
-    pred_idx = int(np.argmax(probs))
+os.makedirs("models", exist_ok=True)
 
-    st.image(img, caption="48x48 Grayscale", width=200)
-    st.write(f"**Prediction:** {CLASS_NAMES[pred_idx]}")
-    st.write("Probabilities:")
-    for i, p in enumerate(probs):
-        st.write(f"- {CLASS_NAMES[i]}: {p:.3f}")
+# download model if missing
+if not os.path.exists(MODEL_PATH):
+    st.write("Downloading model...")
+    urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+    st.write("Model downloaded")
+
+# load model
+model = tf.keras.models.load_model(MODEL_PATH)
+
+uploaded = st.file_uploader("Upload a face image", type=["png","jpg","jpeg"])
+
+if uploaded is not None:
+
+    img = Image.open(uploaded).convert("L").resize((48,48))
+
+    st.image(img, caption="Processed Image")
+
+    img = np.array(img)/255.0
+    img = img.reshape(1,48,48,1)
+
+    preds = model.predict(img)[0]
+    pred = np.argmax(preds)
+
+    st.subheader(f"Prediction: {CLASS_NAMES[pred]}")
+
+    st.bar_chart({CLASS_NAMES[i]:float(preds[i]) for i in range(len(CLASS_NAMES))})
